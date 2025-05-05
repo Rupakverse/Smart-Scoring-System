@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live Scoring - Smart Scoring</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .section {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .scorecard {
+      flex: 1.5;
+      min-width: 300px;
+    }
+
+    .form-box {
+      flex: 1;
+      min-width: 280px;
+    }
+
+    h3 {
+      margin-bottom: 10px;
+      color: #003366;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 8px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    button {
+      padding: 10px 20px;
+      background-color: #003366;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+
+    button:hover {
+      background-color: #0055aa;
+    }
+
+    #mainScoreboard {
+      max-width: 800px;
+      margin: 0 auto 20px;
+      text-align: center;
+    }
+
+    .highlight {
+      font-weight: bold;
+      color: green;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Live Scoring</h2>
+  <p style="text-align:center;" id="matchInfo"></p>
+
+  <!-- Main Scoreboard -->
+  <div id="mainScoreboard" class="section">
+    <h3 id="teamScore">Team A - Score: 0/0 (0.0)</h3>
+    <p id="extrasInfo">Extras: 0 (Wides: 0, No Balls: 0, Leg Byes: 0, Byes: 0)</p>
+    <p id="currentBatsmen"></p>
+  </div>
+
+  <div class="container">
+    <!-- Scorecards -->
+    <div class="section scorecard">
+      <h3>Batting Scorecard</h3>
+      <table id="battingTable">
+        <tr><th>Batsman</th><th>R</th><th>B</th><th>Status</th></tr>
+      </table>
+
+      <h3>Bowling Scorecard</h3>
+      <table id="bowlingTable">
+        <tr><th>Bowler</th><th>O</th><th>R</th><th>W</th></tr>
+      </table>
+      <button onclick="endInning()">End Inning</button>
+      <button id="matchEndBtn" style="display:none;" onclick="endMatch()">End Match</button>
+    </div>
+
+    <!-- Input Form -->
+    <div class="section form-box">
+      <h3>Ball-by-Ball Input</h3>
+      <form id="ballForm">
+        <div class="form-group">
+          <label for="runs">Runs</label>
+          <input type="number" id="runs" min="0" max="6" required />
+        </div>
+        <div class="form-group">
+          <label for="event">Ball Outcome</label>
+          <select id="event">
+            <option value="Normal">Normal</option>
+            <option value="Four">Four</option>
+            <option value="Six">Six</option>
+            <option value="Wide">Wide</option>
+            <option value="No Ball">No Ball</option>
+            <option value="Leg Bye">Leg Bye</option>
+            <option value="Bye">Bye</option>
+            <option value="Wicket">Wicket</option>
+          </select>
+        </div>
+        <button type="submit">Submit Ball</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const match = JSON.parse(localStorage.getItem("matchData"));
+    const teamNames = [match.teamA, match.teamB];
+    let currentInning = 0;
+    document.getElementById("matchInfo").textContent = `${match.title} | Format: ${match.format}`;
+
+    const batsmen = {}; const bowlers = {};
+    const score = { runs: 0, wickets: 0, balls: 0, wides: 0, noBalls: 0, legByes: 0, byes: 0 };
+    let striker = match.batsmen[0];
+    let nonStriker = match.batsmen[1];
+    let bowler = match.bowler;
+    batsmen[striker] = { runs: 0, balls: 0, status: 'Not Out' };
+    batsmen[nonStriker] = { runs: 0, balls: 0, status: 'Not Out' };
+    bowlers[bowler] = { balls: 0, runs: 0, wickets: 0 };
+
+    const teamScoreEl = document.getElementById("teamScore");
+    const extrasInfoEl = document.getElementById("extrasInfo");
+    const currentBatsmenEl = document.getElementById("currentBatsmen");
+    const battingTable = document.getElementById("battingTable");
+    const bowlingTable = document.getElementById("bowlingTable");
+    const matchEndBtn = document.getElementById("matchEndBtn");
+
+    function updateMainScoreboard() {
+      const overs = Math.floor(score.balls / 6) + "." + (score.balls % 6);
+      teamScoreEl.textContent = `${teamNames[currentInning]} - Score: ${score.runs}/${score.wickets} (${overs})`;
+      const extras = score.wides + score.noBalls + score.legByes + score.byes;
+      extrasInfoEl.textContent = `Extras: ${extras} (Wides: ${score.wides}, No Balls: ${score.noBalls}, Leg Byes: ${score.legByes}, Byes: ${score.byes})`;
+      currentBatsmenEl.innerHTML = `<span class="highlight">Striker:</span> ${striker} &nbsp;&nbsp; <span class="highlight">Non-Striker:</span> ${nonStriker}`;
+    }
+
+    function updateScorecards() {
+      battingTable.innerHTML = '<tr><th>Batsman</th><th>R</th><th>B</th><th>Status</th></tr>';
+      Object.entries(batsmen).forEach(([name, stats]) => {
+        battingTable.innerHTML += `<tr><td>${name}</td><td>${stats.runs}</td><td>${stats.balls}</td><td>${stats.status}</td></tr>`;
+      });
+      bowlingTable.innerHTML = '<tr><th>Bowler</th><th>O</th><th>R</th><th>W</th></tr>';
+      Object.entries(bowlers).forEach(([name, stats]) => {
+        const overs = `${Math.floor(stats.balls / 6)}.${stats.balls % 6}`;
+        bowlingTable.innerHTML += `<tr><td>${name}</td><td>${overs}</td><td>${stats.runs}</td><td>${stats.wickets}</td></tr>`;
+      });
+    }
+
+    document.getElementById("ballForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const runs = parseInt(document.getElementById("runs").value);
+      const event = document.getElementById("event").value;
+
+      if (!batsmen[striker]) batsmen[striker] = { runs: 0, balls: 0, status: 'Not Out' };
+      if (!bowlers[bowler]) bowlers[bowler] = { balls: 0, runs: 0, wickets: 0 };
+
+      if (event === "Wide" || event === "No Ball") {
+        const isWide = event === "Wide";
+        if (isWide) score.wides += 1; else score.noBalls += 1;
+        score.runs += (1 + runs);
+        bowlers[bowler].runs += (1 + runs);
+      } else if (event === "Leg Bye") {
+        score.legByes += runs; score.runs += runs;
+        score.balls += 1; bowlers[bowler].balls += 1;
+      } else if (event === "Bye") {
+        score.byes += runs; score.runs += runs;
+        score.balls += 1; bowlers[bowler].balls += 1;
+      } else if (event === "Wicket") {
+        const type = prompt("Enter type of Wicket (Bowled, Caught, Stumped, LBW, Run Out):");
+        if (type.toLowerCase() === "run out") {
+          batsmen[striker].status = "Run Out";
+        } else {
+          batsmen[striker].status = type;
+          bowlers[bowler].wickets += 1;
+        }
+        batsmen[striker].balls += 1;
+        bowlers[bowler].balls += 1;
+        score.balls += 1; score.wickets += 1;
+        const newBatsman = prompt("Enter new batsman:");
+        if (newBatsman) {
+          batsmen[newBatsman] = { runs: 0, balls: 0, status: 'Not Out' };
+          striker = newBatsman;
+        }
+      } else {
+        batsmen[striker].runs += runs;
+        batsmen[striker].balls += 1;
+        bowlers[bowler].runs += runs;
+        bowlers[bowler].balls += 1;
+        score.runs += runs;
+        score.balls += 1;
+        if (runs % 2 === 1) [striker, nonStriker] = [nonStriker, striker];
+      }
+
+      if (bowlers[bowler].balls % 6 === 0 && event !== "Wide" && event !== "No Ball" && score.balls !== 0) {
+        [striker, nonStriker] = [nonStriker, striker];
+        const newBowler = prompt("Over complete. Enter new bowler:");
+        if (newBowler) {
+          bowler = newBowler;
+          if (!bowlers[bowler]) bowlers[bowler] = { balls: 0, runs: 0, wickets: 0 };
+        }
+      }
+
+      updateMainScoreboard();
+      updateScorecards();
+      e.target.reset();
+    });
+
+    function endInning() {
+      alert(`Inning for ${teamNames[currentInning]} ended. Now start second inning.`);
+      currentInning = 1;
+      Object.assign(score, { runs: 0, wickets: 0, balls: 0, wides: 0, noBalls: 0, legByes: 0, byes: 0 });
+      Object.keys(batsmen).forEach(p => delete batsmen[p]);
+      Object.keys(bowlers).forEach(p => delete bowlers[p]);
+      striker = prompt("Enter opening batsman 1:");
+      nonStriker = prompt("Enter opening batsman 2:");
+      bowler = prompt("Enter opening bowler:");
+      batsmen[striker] = { runs: 0, balls: 0, status: 'Not Out' };
+      batsmen[nonStriker] = { runs: 0, balls: 0, status: 'Not Out' };
+      bowlers[bowler] = { balls: 0, runs: 0, wickets: 0 };
+      updateMainScoreboard();
+      updateScorecards();
+      matchEndBtn.style.display = "inline-block";
+    }
+
+    function endMatch() {
+      alert("Match ended. Summary will be shown next.");
+      localStorage.setItem("matchResult", JSON.stringify({ teamA: teamNames[0], teamB: teamNames[1], finalScore: score }));
+      window.location.href = "match-summary.html";
+    }
+
+    updateMainScoreboard();
+    updateScorecards();
+  </script>
+</body>
+</html>

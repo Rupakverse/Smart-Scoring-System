@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Match Summary</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f9f9f9;
+      padding: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.05);
+    }
+    h2, h3 {
+      text-align: center;
+      color: #003366;
+      margin-bottom: 15px;
+    }
+    p {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    .winner {
+      font-weight: bold;
+      color: green;
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #003366;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>Match Summary</h2>
+    <div id="summary"></div>
+  </div>
+
+  <script>
+    const result = JSON.parse(localStorage.getItem("matchResult"));
+    const innings1 = JSON.parse(localStorage.getItem("innings1"));
+    const innings2 = JSON.parse(localStorage.getItem("innings2"));
+    const summaryDiv = document.getElementById("summary");
+
+    if (result && innings1 && innings2) {
+      const { teamA, teamB } = result;
+
+      const formatInning = (data, team) => {
+        const overs = data.balls !== undefined ? Math.floor(data.balls / 6) + "." + (data.balls % 6) : "0.0";
+        const extras = (data.wides || 0) + (data.noBalls || 0) + (data.legByes || 0) + (data.byes || 0);
+        return `
+          <h3>${team} Innings</h3>
+          <p><strong>Score:</strong> ${data.runs || 0}/${data.wickets || 0} in ${overs} overs</p>
+          <p><strong>Extras:</strong> ${extras} (W: ${data.wides || 0}, NB: ${data.noBalls || 0}, LB: ${data.legByes || 0}, B: ${data.byes || 0})</p>
+        `;
+      };
+
+      const winner = innings1.runs > innings2.runs ? teamA : innings2.runs > innings1.runs ? teamB : "Match Tied";
+
+      summaryDiv.innerHTML = `
+        <p><strong>${teamA} vs ${teamB}</strong></p>
+        ${formatInning(innings1, teamA)}
+        ${formatInning(innings2, teamB)}
+        <p class="winner">Result: ${winner === "Match Tied" ? "Match Tied" : winner + " won the match!"}</p>
+      `;
+    } else {
+      summaryDiv.innerHTML = "<p>No complete match data found.</p>";
+    }
+  </script>
+
+</body>
+</html>
